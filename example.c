@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "influx-writer.h"
 
@@ -59,32 +60,36 @@ int main()
     }
 
     //Check how influx DB responded
-   if(get_write_result(&conn)){
+   if(ifwr_response(&conn)){
        //Uh ohh...
        char* json_msg = NULL;
-       int http_error = get_http_err(&conn, &json_msg);
+       int http_error = ifwr_http_err(&conn, &json_msg);
        fprintf(stderr,"InfluxDB Failure with error code %i, and this message \"%s\"\n", http_error, json_msg);
        return -1;
    }
 
 
    //Now use the direct raw send API (which is kind of like printf)
-    char line[1024] = {};
     for(int i = 0; i < 100; i++){
-        int ret = ifwr_write_raw(&conn,"weather,city=perth temp=%lii,pressure=%lf %i", rand(), rand(), time(NULL));
+        int ret = ifwr_write_raw(&conn,"ns","weather,city=perth temp=%" PRIu64 "i,pressure=%lf %i", rand(), rand(), time(NULL));
         if(ret < 0){
             fprintf(stderr,"Could not send IFWR message. Error: %s\n",ifwr_lasterr_str(&conn));
             return -1;
         }
 
         //Check how influx DB responded
-       if(get_write_result(&conn)){
+       if(ifwr_response(&conn)){
            //Uh ohh...
            char* json_msg = NULL;
-           int http_error = get_http_err(&conn, &json_msg);
+           int http_error = ifwr_http_err(&conn, &json_msg);
            fprintf(stderr,"InfluxDB Failure with error code %i, and this message \"%s\"\n", http_error, json_msg);
            return -1;
        }
+
+       //Update the values
+       fieldset[TEMP].value.i = rand();
+       fieldset[PRES].value.f = rand();
+
     }
 
     // close the connectoin

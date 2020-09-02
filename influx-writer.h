@@ -278,7 +278,7 @@ int ifwr_write_raw(ifwr_conn_t* conn, const char* prec, const char* format, ... 
  *
  * @return 0 on success, -1 on failure. If failure, the http_err number can be
  */
-int get_write_result(ifwr_conn_t* conn);
+int ifwr_response(ifwr_conn_t* conn);
 
 /**
  * @brief Return the HTTP error code for the last write. Must be run after
@@ -291,7 +291,7 @@ int get_write_result(ifwr_conn_t* conn);
  *
  * @return the last HTTP error status number (typically ~400) for an error.
  */
-int get_http_err(ifwr_conn_t* conn, char** json_msg);
+int ifwr_http_err(ifwr_conn_t* conn, char** json_msg);
 
 
 

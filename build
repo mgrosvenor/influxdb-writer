@@ -1,0 +1,25 @@
+#! /usr/bin/env bash
+
+set -euf -o pipefail
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: bild [debug | release]"
+    exit 1
+fi
+
+cflags_global="-std=c99 -Wall -g"
+cflags_release="$cflags_global -O3 -DNDEBUG"
+cflags_debug="$cflags_global -Werror -pedantic"
+
+deps="example.c debug.c influx-writer.c inih/ini.c"
+out="example"
+
+
+if [ "$1" = "debug" ]; then
+    flags=$cflags_debug
+else
+    flags=$cflags_release
+fi
+
+set -x
+gcc -o $out $deps $flags

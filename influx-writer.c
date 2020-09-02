@@ -5,7 +5,6 @@
  *      Author: m0110
  */
 
-#include "influx-writer.h"
 
 #include <stdbool.h>
 #include <netdb.h>
@@ -21,74 +20,11 @@
 #include <errno.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 
+#include "influx-writer.h"
+#include "debug.h"
 
-/*
- * A little bit of self contained debugging help from
- * https://github.com/mgrosvenor/libchaste/blob/master/utils/debug.c
- */
-
-typedef enum {
-    IFWR_DBG,	//Debug message
-	IFWR_ERR,	//Error message
-	IFWR_FAT,	//Fatal message
-	IFWR_WARN	//Warning message
-} ifwr_dbg_mode_e;
-
-#define OUTPUT_TO STDERR_FILENO
-
-static int ifwr_dbg_out_(
-        bool info,
-        ifwr_dbg_mode_e mode,
-        int line_num,
-        const char* filename,
-        const char* function,
-        const char* format, ... ) //Intentionally using char* here as these are passed in as constants
-{
-    va_list args;
-    va_start(args,format);
-    char* fn =  (char*)filename;
-    char* mode_str = NULL;
-    switch(mode){
-        case IFWR_ERR:   mode_str = "Error"; break;
-        case IFWR_FAT:   mode_str = "Fatal"; break;
-        case IFWR_DBG:   mode_str = "Debug"; break;
-        case IFWR_WARN:  mode_str = "Warning:"; break;
-    }
-    if(info) dprintf(OUTPUT_TO,"[%s - %s:%i:%s()]  ", mode_str, basename(fn), (int)line_num, function);
-    int result = vdprintf(OUTPUT_TO,format,args);
-    va_end(args);
-
-    if(mode == IFWR_FAT){
-    	exit(-1);
-    }
-
-    return result;
-}
-
-#define ERR( /*format, args*/...)  ifwr_err_helper(__VA_ARGS__, "")
-#define ifwr_err_helper(format, ...) ifwr_dbg_out_(true, IFWR_ERR, __LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-#define ERR2( /*format, args*/...)  ifwr_err_helper2(__VA_ARGS__, "")
-#define ifwr_err_helper2(format, ...) ifwr_dbg_out_(false, IFWR_ERR, __LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-
-#define FAT( /*format, args*/...)  ifwr_fat_helper(__VA_ARGS__, "")
-#define ifwr_fat_helper(format, ...) ifwr_dbg_out_(true, IFWR_FAT, __LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-#define FAT2( /*format, args*/...)  ifwr_fat_helper2(__VA_ARGS__, "")
-#define ifwr_fat_helper2(format, ...) ifwr_dbg_out_(false, IFWR_FAT, __LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-
-#ifndef NDEBUG
-    //int ifwr_dbg_out_(ch_bool info, int line_num, const char* filename, const char* function,  const char* format, ... );
-    #define DBG( /*format, args*/...)  ifwr_dbg_helper(__VA_ARGS__, "")
-    #define ifwr_dbg_helper(format, ...) ifwr_dbg_out_(true,IFWR_DBG,__LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-    #define DBG2( /*format, args*/...)  ifwr_dbg_helper2(__VA_ARGS__, "")
-    #define ifwr_dbg_helper2(format, ...) ifwr_dbg_out_(false,IFWR_DBG,__LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-    #define WARN( /*format, args*/...)  ifwr_dbg_helper3(__VA_ARGS__, "")
-    #define ifwr_dbg_helper3(format, ...) ifwr_dbg_out_(true,IFWR_WARN,__LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
-#else
-    #define DBG( /*format, args*/...)
-    #define DBG2( /*format, args*/...)
-    #define WARN( /*format, args*/...)
-#endif
 
 
 #define IFWR_SET_ERROR(errno) do { \
@@ -244,7 +180,7 @@ int ifwr_connect(ifwr_conn_t* conn )
 
 	DBG("Socket successfully created..\n");
 
-	struct sockaddr_in servaddr = {};
+	struct sockaddr_in servaddr = {0};
 	if(resolve_host(conn->hostname,&servaddr.sin_addr)){
 		DBG("Error, could not resolve hostname %s\n", conn->hostname);
 		IFWR_SET_ERROR(IFWR_ERR_HOSTNAME);
@@ -343,7 +279,7 @@ static int ifwr_fmt_set(
 	for(ifwr_ktv_t* v = values;  v->type != IFWR_TYPE_STOP; v++){
 		switch(v->type){
 		case IFWR_TYPE_INT:
-			off += snprintf(buff + off, len - off, "%s=%lii,", v->key, v->value.i);
+			off += snprintf(buff + off, len - off, "%s=%" PRIu64 "i,", v->key, v->value.i);
 			continue;
 		case IFWR_TYPE_FLOAT:
 			off += snprintf(buff + off, len - off, "%s=%lf,", v->key, v->value.f);
@@ -439,11 +375,9 @@ static int http_write(ifwr_conn_t* conn, const char* type, const char* buff, int
 }
 
 
-static int http_post_header(ifwr_conn_t* conn, int content_len, char* prec)
+static int http_post_header(ifwr_conn_t* conn, int content_len, const char* prec)
 {
-	ifwr_priv_t* const priv = &conn->__private;
-
-    char buff[IFWR_MAX_MSG] = {};
+    char buff[IFWR_MAX_MSG] = {0};
 
     int header_len = snprintf(buff, IFWR_MAX_MSG, "POST /api/v2/write?org=%s&bucket=%s&precision=%s HTTP/1.1\r\nHost: %s:%i\r\nContent-Length: %i\r\nContent-Encoding: identity\r\nContent-Type: text/plain\r\nAccept: application/json\r\nAuthorization: Token %s\r\nUser-Agent: exact-capture-influx 1.0\r\n\r\n",
         conn->org,
@@ -465,10 +399,10 @@ static int http_post_content(ifwr_conn_t* conn, const char* content, int content
 
 
 
-__attribute__((__format__ (__printf__, 2, 0)))
+__attribute__((__format__ (__printf__, 3, 0)))
 int ifwr_write_raw(ifwr_conn_t* conn, const char* prec, const char* format, ... )
 {
-    char content[IFWR_MAX_MSG] = {};
+    char content[IFWR_MAX_MSG] = {0};
     va_list args;
     va_start(args,format);
     int content_len = vsnprintf(content, IFWR_MAX_MSG,format, args);
@@ -498,8 +432,13 @@ int ifwr_write_raw(ifwr_conn_t* conn, const char* prec, const char* format, ... 
 static int ktv2str(char* buff, int buff_len, const ifwr_ktv_t* ktv )
 {
     int written = 0;
-    for(ifwr_ktv_t* curr = ktv; curr->type != IFWR_TYPE_STOP; curr++){
+    for(const ifwr_ktv_t* curr = ktv; curr->type != IFWR_TYPE_STOP; curr++){
         switch(curr->type){
+            case IFWR_TYPE_STOP:
+                //Impossible ? -- handled above
+                FAT("Impossible situation has happend!?\n");
+                break;
+
             case IFWR_TYPE_BOOL:
                 if(curr->value.b){
                     written += snprintf(buff + written, buff_len - written,"%s=True,", curr->key );
@@ -514,13 +453,17 @@ static int ktv2str(char* buff, int buff_len, const ifwr_ktv_t* ktv )
                 continue;
 
             case IFWR_TYPE_INT:
-                written += snprintf(buff + written, buff_len - written,"%s=%lii,", curr->key, curr->value.i );
+                written += snprintf(buff + written, buff_len - written,"%s=%" PRIu64 "i,", curr->key, curr->value.i );
                 continue;
-
 
             case IFWR_TYPE_STRING:
                 written += snprintf(buff + written, buff_len - written,"%s=\"%s\",", curr->key, curr->value.s );
                 continue;
+
+            case IFWR_TYPE_UNKOWN:
+                ERR("Found a type of UNKOWN, was your KTV unitialised?\n");
+                break;
+
         }
     }
 
@@ -576,14 +519,14 @@ int ifwr_send(
         tags_str = priv->default_tagset;
     }
     else{
-        char tmp_tags[IFWR_MAX_MSG] = {};
+        char tmp_tags[IFWR_MAX_MSG] = {0};
         ktv2str(tmp_tags, IFWR_MAX_MSG, tags);
         tags_str = tmp_tags;
     }
     DBG("Tags set to \"%s\"\n", tags_str);
 
     //Figure out the fields
-    char fields_str[IFWR_MAX_MSG] = {};
+    char fields_str[IFWR_MAX_MSG] = {0};
     if(!fields){
         IFWR_SET_ERROR(IFWR_ERR_NOFIELDS);
         ERR("No measurement fields supplied!\n");
@@ -596,8 +539,8 @@ int ifwr_send(
 
     //Figure out the timestamp
     char* prec = NULL;
-    const int TS_LEN_MAX = 64;
-    char ts_str_tmp[TS_LEN_MAX] = {};
+    #define TS_LEN_MAX 64
+    char ts_str_tmp[TS_LEN_MAX] = {0};
     char* ts_str = NULL;
 
     switch(ts_fmt){
@@ -606,7 +549,7 @@ int ifwr_send(
             ERR("No timestamp value set!\n");
             return -1;
         case IFWR_TS_LOCAL:{
-            struct timespec now_ts = {};
+            struct timespec now_ts = {0};
             if(clock_gettime(CLOCK_REALTIME, &now_ts) < 0){
                 ERR("Could not get time! Error: %s", strerror(errno));
                 IFWR_SET_ERROR(IFWR_ERR_NOTIME);
@@ -616,7 +559,7 @@ int ifwr_send(
             int64_t ns = now_ts.tv_sec * 1000 * 1000 * 1000 + now_ts.tv_nsec;
 
             prec = "ns";
-            snprintf(ts_str_tmp,TS_LEN_MAX,"%li",ns);
+            snprintf(ts_str_tmp,TS_LEN_MAX,"%" PRIu64,ns);
             ts_str = ts_str_tmp;
             break;
         }
@@ -628,25 +571,25 @@ int ifwr_send(
         case IFWR_TS_NANOS:
             prec = "ns";
             //TODO - some sanity check that this is a sensible nanosecond value
-            snprintf(ts_str_tmp,TS_LEN_MAX,"%li",ts_val);
+            snprintf(ts_str_tmp,TS_LEN_MAX,"%" PRIu64 ,ts_val);
             ts_str = ts_str_tmp;
             break;
         case IFWR_TS_MICROS:
             prec = "us";
             //TODO - some sanity check that this is a sensible microsecond value
-            snprintf(ts_str_tmp,TS_LEN_MAX,"%li",ts_val);
+            snprintf(ts_str_tmp,TS_LEN_MAX,"%" PRIu64,ts_val);
             ts_str = ts_str_tmp;
             break;
         case IFWR_TS_MILLIS:
             prec = "ms";
             //TODO - some sanity check that this is a sensible milliscecond value
-            snprintf(ts_str_tmp,TS_LEN_MAX,"%li",ts_val);
+            snprintf(ts_str_tmp,TS_LEN_MAX,"%" PRIu64,ts_val);
             ts_str = ts_str_tmp;
             break;
         case IFWR_TS_SECS:
             prec = "s";
             //TODO - some sanity check that this is a sensible seconds value
-            snprintf(ts_str_tmp,TS_LEN_MAX,"%li",ts_val);
+            snprintf(ts_str_tmp,TS_LEN_MAX,"%" PRIu64,ts_val);
             ts_str = ts_str_tmp;
             break;
 
@@ -668,7 +611,7 @@ int ifwr_send(
 }
 
 
-int get_write_result(ifwr_conn_t* conn)
+int ifwr_response(ifwr_conn_t* conn)
 {
     if(!conn){
           DBG("No connection supplied\n");
@@ -704,7 +647,7 @@ int get_write_result(ifwr_conn_t* conn)
 
     priv->http_err_code = http_err_code;
     if(http_err_code >= 200 && http_err_code < 300 ){
-        DBG("Success with HTTP response code %li\n", http_err_code);
+        DBG("Success with HTTP response code %i\n", http_err_code);
         priv->json_err_str = NULL;
         return 0;
     }
@@ -712,7 +655,7 @@ int get_write_result(ifwr_conn_t* conn)
     token = strtok(NULL,"\r\n");
     while(token != NULL){
         if(token[0] == '{'){ //HACK! Assume the error line is JSON and starts with "{"
-            DBG("Failure with HTTP response code %li, message \"%s\"\n", http_err_code, token );
+            DBG("Failure with HTTP response code %i, message \"%s\"\n", http_err_code, token );
             priv->json_err_str = token;
             return -1;
         }
@@ -725,7 +668,7 @@ int get_write_result(ifwr_conn_t* conn)
     return -1;
 }
 
-int get_http_err(ifwr_conn_t* conn, char** json_msg)
+int ifwr_http_err(ifwr_conn_t* conn, char** json_msg)
 {
     if(!conn){
           DBG("No connection supplied\n");
