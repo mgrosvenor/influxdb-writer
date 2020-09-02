@@ -16,17 +16,7 @@
 #include "influx-writer.h"
 
 
-
-
-//Set up the connection parameters
-ifwr_conn_t conn = {
-        .hostname = "localhost",
-        .port     = 9999,
-        .token    = "G6MoEcf4w_rvGJ_x-0x04e5Ax47CyWiiLYZgzhhuzro4hoIEd9w388WuhufPrp8l2eRmkJyS5I5I40sD6-as-w==",
-        .org      = "75bf55139267dc4e",
-        .bucket   = "adff3189f4259536"
-};
-
+//Ini file parsing with inih
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
 static int handler(void* user, const char* section, const char* name,
                    const char* value)
