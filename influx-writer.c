@@ -215,7 +215,7 @@ void ifwr_close(ifwr_conn_t* conn)
     ifwr_priv_t* const priv = &conn->__private;
     close(priv->sockfd);
 
-    DBG("Success! Closed the socket!");
+    DBG("Success! Closed the socket!\n");
 
 }
 
@@ -370,7 +370,7 @@ static int http_write(ifwr_conn_t* conn, const char* type, const char* buff, int
         return -1;
     }
 
-    DBG("Success! Wrote %i bytes of HTTP %s\n", type);
+    DBG("Success! Wrote %i bytes of HTTP %s\n", written);
     return written;
 }
 
@@ -399,7 +399,7 @@ static int http_post_content(ifwr_conn_t* conn, const char* content, int content
 
 
 
-__attribute__((__format__ (__printf__, 3, 0)))
+__attribute__((__format__ (__printf__, 3, 4)))
 int ifwr_write_raw(ifwr_conn_t* conn, const char* prec, const char* format, ... )
 {
     char content[IFWR_MAX_MSG] = {0};
@@ -469,7 +469,7 @@ static int ktv2str(char* buff, int buff_len, const ifwr_ktv_t* ktv )
 
     //Remove the tailing "," , replace with a null terminator
     if(buff_len - written > 0){
-        buff[buff_len] = 0;
+        buff[written -1] = 0;
     }
 
     return written;
@@ -533,8 +533,8 @@ int ifwr_send(
         return -1;
     }
 
-    ktv2str(fields_str, IFWR_MAX_MSG, tags);
-    DBG("Fields set to \"%s\"", fields_str);
+    ktv2str(fields_str, IFWR_MAX_MSG, fields);
+    DBG("Fields set to \"%s\"\n", fields_str);
 
 
     //Figure out the timestamp
@@ -597,12 +597,12 @@ int ifwr_send(
           * I've forgotten a value.
           * */
     }
-    DBG("Timestamp precision is \"%s\"", prec);
+    DBG("Timestamp precision is \"%s\"\n", prec);
     DBG("Timestamp string is \"%s\"\n ", ts_str_tmp);
 
 
     //At this point we have strings for everything, just need to format it
-    return ifwr_write_raw(conn, prec, "%s %s %s %s\r\n",
+    return ifwr_write_raw(conn, prec, "%s,%s %s %s\r\n",
             measurement,
             tags_str,
             fields_str,
@@ -638,7 +638,7 @@ int ifwr_response(ifwr_conn_t* conn)
     char err[4] = {0};
     char* end;
     memcpy(err,token + 9,3);
-    int64_t http_err_code = strtol(err,&end,10);
+    long http_err_code = strtol(err,&end,10);
     if(end == err){
         ERR("No error code found in HTTP header response \"%s\"\n", token);
         IFWR_SET_ERROR(IFWR_ERR_BADHTTP);
@@ -647,7 +647,7 @@ int ifwr_response(ifwr_conn_t* conn)
 
     priv->http_err_code = http_err_code;
     if(http_err_code >= 200 && http_err_code < 300 ){
-        DBG("Success with HTTP response code %i\n", http_err_code);
+        DBG("Success with HTTP response code %li\n", http_err_code);
         priv->json_err_str = NULL;
         return 0;
     }
@@ -655,7 +655,7 @@ int ifwr_response(ifwr_conn_t* conn)
     token = strtok(NULL,"\r\n");
     while(token != NULL){
         if(token[0] == '{'){ //HACK! Assume the error line is JSON and starts with "{"
-            DBG("Failure with HTTP response code %i, message \"%s\"\n", http_err_code, token );
+            DBG("Failure with HTTP response code %li, message \"%s\"\n", http_err_code, token );
             priv->json_err_str = token;
             return -1;
         }

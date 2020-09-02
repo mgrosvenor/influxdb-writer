@@ -7,7 +7,7 @@
 
 #ifndef DEBUG_H_
 #define DEBUG_H_
-
+#include <stdbool.h>
 
 /*
  * A little bit of self contained debugging help from
@@ -48,7 +48,7 @@ typedef enum {
     #define WARN( /*format, args*/...)
 #endif
 
-
+__attribute__((__format__ (__printf__, 6, 7)))
 int ifwr_dbg_out_(
         bool info,
         ifwr_dbg_mode_e mode,

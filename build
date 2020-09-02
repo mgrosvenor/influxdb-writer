@@ -7,7 +7,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-cflags_global="-std=c99 -Wall -g"
+cflags_global="-std=c99 -Wall -g -Wno-format-extra-args"
 cflags_release="$cflags_global -O3 -DNDEBUG"
 cflags_debug="$cflags_global -Werror -pedantic"
 

@@ -267,7 +267,7 @@ int ifwr_send(
  *
  * @return The number of bytes written
  */
-__attribute__((__format__ (__printf__, 2, 0)))
+__attribute__((__format__ (__printf__, 3, 4)))
 int ifwr_write_raw(ifwr_conn_t* conn, const char* prec, const char* format, ... );
 
 /**
