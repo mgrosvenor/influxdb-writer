@@ -56,12 +56,14 @@ typedef enum
 //Cap the maximum message size at 64K. Because it seems silly to leave it
 //uncapped
 #define IFWR_MAX_MSG 64 * 1024
+#define IFWR_RX_BUFF (4* 1024 * 1024) //4MB RX buffer
 
 typedef struct ifwr_priv
 {
     ifwr_err_e last_err;
     int sockfd;
-    char rx_buff[IFWR_MAX_MSG];
+    char rx_buff[IFWR_RX_BUFF];
+    int rx_buff_off;
     char* default_measurement;
     char* default_tagset;
     int http_err_code;

@@ -627,7 +627,7 @@ int ifwr_response(ifwr_conn_t* conn)
     ifwr_priv_t* const priv = &conn->__private;
 
 
-    int len = read(priv->sockfd, priv->rx_buff, IFWR_MAX_MSG);
+    int len = read(priv->sockfd, priv->rx_buff + priv->rx_buff_off, IFWR_RX_BUFF - priv->rx_buff_off);
     if(len == 0){
     	IFWR_ERR("Connection to InfluxDB has been closed by the remote end\n");
     	IFWR_SET_ERROR(IFWR_ERR_CONNECT);
@@ -635,20 +635,25 @@ int ifwr_response(ifwr_conn_t* conn)
     }
 
     if(len < 14){ //HTTP header string should be at least 14 bytes
-    	IFWR_ERR("Connection failed to return a valid responsed\n");
+    	IFWR_ERR("Connection failed to return a valid response\n");
     	IFWR_SET_ERROR(IFWR_ERR_CONNECT);
     	return -1;
     }
 
-    char* token = strtok(priv->rx_buff,"\r\n");
-
-    //Check if we've got a correct HTTP header
     if(memcmp(token,"HTTP/1.1 ",9) != 0){
         IFWR_ERR("Could not interpret \"%s\" as an HTTP header response\n", token);
         IFWR_SET_ERROR(IFWR_ERR_BADHTTP);
         return -1;
 
     }
+
+
+
+
+    char* token = strtok(priv->rx_buff,"\r\n");
+
+    //Check if we've got a correct HTTP header
+
 
     //Grab the response code
     char err[4] = {0};
