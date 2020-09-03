@@ -8,18 +8,22 @@ if [ "$#" -ne 1 ]; then
 fi
 
 
-if [ "$1" = "hfile" ]; then
-   cat debug.h influx-writer.h debug.c influx-writer.c > influx-writer-headeronly.h
-   exit 0 
-fi
-
 
 cflags_global="-std=c99 -Wall -g -Wno-format-extra-args"
 cflags_release="$cflags_global -O3 -DNDEBUG"
 cflags_debug="$cflags_global -Werror -pedantic"
+CC=clang
 
 deps="example.c debug.c influx-writer.c inih/ini.c"
 out="example"
+
+if [ "$1" = "hfile" ]; then
+    cat debug.h influx-writer.h debug.c influx-writer.c > influx-writer-headeronly.h
+    set -x
+    $CC -o influx-writer-headeronly.test $cflags_release influx-writer-headeronly.h
+    rm influx-writer-headeronly.test
+    exit 0 
+fi
 
 
 if [ "$1" = "debug" ]; then
@@ -29,4 +33,4 @@ else
 fi
 
 set -x
-gcc -o $out $deps $flags
+$CC -o $out $deps $flags
