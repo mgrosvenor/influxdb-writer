@@ -1,3 +1,6 @@
+example
+influx-writer-headeronly.h
+
 # Prerequisites
 *.d
 
