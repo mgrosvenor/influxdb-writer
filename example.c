@@ -111,7 +111,7 @@ int main(int argc, char** argv)
         printf("Sending measurement at time = %" PRIu64 ", temperature=%" PRIu64 ", pressure=%lf\n",
                 now_ns, fieldset[TEMP].value.i,  fieldset[PRES].value.f  );
 
-        int ret = ifwr_write_raw(&conn,"ns","weather,city=perth temp=%i,pressure=%lf %" PRIu64 , rand(), (double)rand(), now_ns);
+        int ret = ifwr_write_raw(&conn,"ns","weather,city=perth temperature=%i,pressure=%lf %" PRIu64 , rand(), (double)rand(), now_ns);
         if(ret < 0){
             fprintf(stderr,"Could not send IFWR message. Error: %s\n",ifwr_lasterr_str(&conn));
             return -1;
@@ -132,6 +132,6 @@ int main(int argc, char** argv)
 
     }
 
-    // close the connectoin
+    // close the connection
     ifwr_close(&conn);
 }
