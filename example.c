@@ -105,10 +105,13 @@ int main(int argc, char** argv)
    //Now use the direct raw send API (which is kind of like printf)
     for(int i = 0; i < 100; i++){
 
-        printf("Sending measurement at time = %i, temperature=%" PRIu64 ", pressure=%lf\n",
-                time_now, fieldset[TEMP].value.i,  fieldset[PRES].value.f  );
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        int64_t now_ns = ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
+        printf("Sending measurement at time = %" PRIu64 ", temperature=%" PRIu64 ", pressure=%lf\n",
+                now_ns, fieldset[TEMP].value.i,  fieldset[PRES].value.f  );
 
-        int ret = ifwr_write_raw(&conn,"s","weather,city=perth temp=%i,pressure=%lf %li", rand(), (double)rand(), time(NULL));
+        int ret = ifwr_write_raw(&conn,"ns","weather,city=perth temp=%i,pressure=%lf %" PRIu64 , rand(), (double)rand(), now_ns);
         if(ret < 0){
             fprintf(stderr,"Could not send IFWR message. Error: %s\n",ifwr_lasterr_str(&conn));
             return -1;
