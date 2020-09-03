@@ -5,8 +5,8 @@
  *      Author: mgrosvenor
  */
 
-#ifndef DEBUG_H_
-#define DEBUG_H_
+#ifndef IFWR_DEBUG_H_
+#define IFWR_DEBUG_H_
 #include <stdbool.h>
 
 /*
@@ -48,7 +48,6 @@ typedef enum {
     #define IFWR_WARN( /*format, args*/...)
 #endif
 
-__attribute__((__format__ (__printf__, 6, 7)))
 int ifwr_dbg_out_(
         bool info,
         ifwr_dbg_mode_e mode,
@@ -59,4 +58,4 @@ int ifwr_dbg_out_(
 
 
 
-#endif /* DEBUG_H_ */
+#endif /* IFWR_DEBUG_H_ */

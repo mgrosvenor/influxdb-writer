@@ -6,7 +6,10 @@
  */
 
 #define _POSIX_C_SOURCE  200809L
-#define _GNU_SOURCE
+
+#ifndef _GNU_SOURCE
+	#define _GNU_SOURCE
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
