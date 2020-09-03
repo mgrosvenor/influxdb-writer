@@ -5,6 +5,9 @@
  *      Author: m0110
  */
 
+#define _POSIX_C_SOURCE  200809L
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -15,6 +18,15 @@
 #include "inih/ini.h"
 #include "influx-writer.h"
 
+//Not a C99 function
+static char* strdup2(const char* src)
+{
+	const int len = strlen(src);
+	char* new = calloc(1,len+1);
+	strcpy(new,src);
+	return new;
+}
+
 
 //Ini file parsing with inih
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
@@ -24,19 +36,19 @@ static int handler(void* user, const char* section, const char* name,
     ifwr_conn_t* conn = (ifwr_conn_t*)user;
 
     if (MATCH("influxdb", "hostname")) {
-        conn->hostname = strdup(value);
+        conn->hostname = strdup2(value);
     }
     else if (MATCH("influxdb", "port")) {
         conn->port = atoi(value);
     }
     else if (MATCH("influxdb", "organization")) {
-        conn->org = strdup(value);
+        conn->org = strdup2(value);
     }
     else if (MATCH("influxdb", "bucket")) {
-        conn->bucket = strdup(value);
+        conn->bucket = strdup2(value);
     }
     else if (MATCH("influxdb", "token")) {
-        conn->token = strdup(value);
+        conn->token = strdup2(value);
     }
     else {
         return 0;  /* unknown section/name, error */

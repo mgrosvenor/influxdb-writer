@@ -3,9 +3,16 @@
 set -euf -o pipefail
 
 if [ "$#" -ne 1 ]; then
-    echo "Usage: bild [debug | release]"
+    echo "Usage: bild [debug | release | hfile ]"
     exit 1
 fi
+
+
+if [ "$1" = "hfile" ]; then
+   cat debug.h influx-writer.h debug.c influx-writer.c > influx-writer-headeronly.h
+   exit 0 
+fi
+
 
 cflags_global="-std=c99 -Wall -g -Wno-format-extra-args"
 cflags_release="$cflags_global -O3 -DNDEBUG"

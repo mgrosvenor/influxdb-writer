@@ -1,9 +1,12 @@
 /*
- * influxable.c
+ * influx-writer.c
  *
  *  Created on: Aug 30, 2020
- *      Author: m0110
+ *      Author: Matthew P. Grosvenor
  */
+
+#define _POSIX_C_SOURCE  200809L
+#define _GNU_SOURCE
 
 
 #include <stdbool.h>
@@ -27,7 +30,7 @@
 
 
 
-#define IFWR_SET_ERROR(errno) do { \
+#define IFWR_SET_IFWR_ERROR(errno) do { \
 		conn->__private.last_err = errno; \
 } while (0)
 
@@ -107,7 +110,7 @@ static int resolve_host(const char* hostname, struct in_addr* out)
     if ((he = gethostbyname(hostname)) == NULL)
     {
         // get the host info
-        DBG("Error getting hostname: %s\n", hstrerror(h_errno));
+        IFWR_DBG("Error getting hostname: %s\n", strerror(errno));
         return -1;
     }
 
@@ -121,11 +124,11 @@ static int resolve_host(const char* hostname, struct in_addr* out)
         char str[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, out, str, INET_ADDRSTRLEN);
 
-        DBG("Success! Host resolved. Returning address %s\n", str);
+        IFWR_DBG("Success! Host resolved. Returning address %s\n", str);
         return 0;
     }
 
-    DBG("Error no IP addresses found!\n");
+    IFWR_DBG("Error no IP addresses found!\n");
     return -1;
 }
 
@@ -134,38 +137,38 @@ static int resolve_host(const char* hostname, struct in_addr* out)
 int ifwr_connect(ifwr_conn_t* conn )
 {
 	if(!conn){
-		DBG("No connection supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+		IFWR_DBG("No connection supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
 		return -1;
 	}
 
 	if(!conn->hostname){
-		DBG("No hostname supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No hostname supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
 	if(conn->port < 0 || conn->port > 65536){
-		DBG("Port number should be in the range [0..65536]\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("Port number should be in the range [0..65536]\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
 	if(!conn->org){
-		DBG("No organization ID supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No organization ID supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
 	if(!conn->bucket){
-		DBG("No bucket ID supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No bucket ID supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
 	if(!conn->token){
-		DBG("No authorization token supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No authorization token supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
@@ -173,17 +176,17 @@ int ifwr_connect(ifwr_conn_t* conn )
 
 	priv->sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (priv->sockfd == -1) {
-		DBG("Socket creation failed...\n");
-		IFWR_SET_ERROR(IFWR_ERR_SOCKET);
+		IFWR_DBG("Socket creation failed...\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_SOCKET);
 		return -1;
 	}
 
-	DBG("Socket successfully created..\n");
+	IFWR_DBG("Socket successfully created..\n");
 
 	struct sockaddr_in servaddr = {0};
 	if(resolve_host(conn->hostname,&servaddr.sin_addr)){
-		DBG("Error, could not resolve hostname %s\n", conn->hostname);
-		IFWR_SET_ERROR(IFWR_ERR_HOSTNAME);
+		IFWR_DBG("Error, could not resolve hostname %s\n", conn->hostname);
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_HOSTNAME);
 		return -1;
 	}
 
@@ -192,12 +195,12 @@ int ifwr_connect(ifwr_conn_t* conn )
 
 	// connect the client socket to server socket
 	if (connect(priv->sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0) {
-		DBG("connection with the server failed...\n");
-		IFWR_SET_ERROR(IFWR_ERR_CONNECT);
+		IFWR_DBG("connection with the server failed...\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_CONNECT);
 		return -1;
 	}
 
-	DBG("Success! Connected to the server %s:%i..\n",
+	IFWR_DBG("Success! Connected to the server %s:%i..\n",
 			conn->hostname,
 			conn->port);
 
@@ -207,15 +210,15 @@ int ifwr_connect(ifwr_conn_t* conn )
 void ifwr_close(ifwr_conn_t* conn)
 {
     if(!conn){
-        DBG("No connection state supplied\n");
-        IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+        IFWR_DBG("No connection state supplied\n");
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
         return;
     }
 
     ifwr_priv_t* const priv = &conn->__private;
     close(priv->sockfd);
 
-    DBG("Success! Closed the socket!\n");
+    IFWR_DBG("Success! Closed the socket!\n");
 
 }
 
@@ -223,14 +226,14 @@ void ifwr_close(ifwr_conn_t* conn)
 int ifwr_set_measurement(ifwr_conn_t* conn, char* measurement)
 {
 	if(!conn){
-		DBG("No connection supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+		IFWR_DBG("No connection supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
 		return -1;
 	}
 
 	if(!measurement){
-		DBG("No measurement name supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No measurement name supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
@@ -238,7 +241,7 @@ int ifwr_set_measurement(ifwr_conn_t* conn, char* measurement)
 
 	priv->default_measurement = measurement;
 
-	DBG("Success! Set the default measuremt to \"%s\"\n", measurement);
+	IFWR_DBG("Success! Set the default measuremt to \"%s\"\n", measurement);
 	return 0;
 }
 
@@ -252,26 +255,26 @@ static int ifwr_fmt_set(
 )
 {
 	if(!conn){
-		DBG("No connection state supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+		IFWR_DBG("No connection state supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
 		return -1;
 	}
 
 	if(!buff){
-		DBG("No outut buffer supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No outut buffer supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
 	if(len < 0){
-		DBG("No output buffer supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No output buffer supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
 	if(len > IFWR_MAX_MSG){
-		DBG("Buffer is too big\n");
-		IFWR_SET_ERROR(IFWR_ERR_MSGTOOBIG);
+		IFWR_DBG("Buffer is too big\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_MSGTOOBIG);
 		return -1;
 	}
 
@@ -294,8 +297,8 @@ static int ifwr_fmt_set(
 				off += snprintf(buff + off, len - off, "%s=False,", v->key);
 			continue;
 		default:
-			DBG("Unexpected type %i\n", v->type);
-			IFWR_SET_ERROR(IFWR_ERR_UNKNOWN);
+			IFWR_DBG("Unexpected type %i\n", v->type);
+			IFWR_SET_IFWR_ERROR(IFWR_ERR_UNKNOWN);
 			return -1;
 		}
 	}
@@ -307,7 +310,7 @@ static int ifwr_fmt_set(
 	buff[off] = 0;
 	off--;
 
-	DBG("Successfully formatted %sset \"%s\"\n", settype, buff);
+	IFWR_DBG("Successfully formatted %sset \"%s\"\n", settype, buff);
 	return off;
 
 }
@@ -321,14 +324,14 @@ int ifwr_fmt_tagset(ifwr_conn_t* conn, ifwr_ktv_t* values, int len, char* buff)
 int ifwr_set_tagset(ifwr_conn_t* conn, char* tagset)
 {
 	if(!conn){
-		DBG("No connection supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+		IFWR_DBG("No connection supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
 		return -1;
 	}
 
 	if(!tagset){
-		DBG("No tagset name supplied\n");
-		IFWR_SET_ERROR(IFWR_ERR_BADARGS);
+		IFWR_DBG("No tagset name supplied\n");
+		IFWR_SET_IFWR_ERROR(IFWR_ERR_BADARGS);
 		return -1;
 	}
 
@@ -336,7 +339,7 @@ int ifwr_set_tagset(ifwr_conn_t* conn, char* tagset)
 
 	priv->default_tagset = tagset;
 
-	DBG("Success! Set the default tagset to \"%s\"\n", tagset);
+	IFWR_DBG("Success! Set the default tagset to \"%s\"\n", tagset);
 	return 0;
 }
 
@@ -353,24 +356,24 @@ static int http_write(ifwr_conn_t* conn, const char* type, const char* buff, int
 
     int written = 0;
     int attempts_remaing = 1000;
-    DBG("Trying to write %i bytes of HTTP %s \"%s\"", len, type, buff);
+    IFWR_DBG("Trying to write %i bytes of HTTP %s \"%s\"", len, type, buff);
     for(;len - written > 0 && attempts_remaing; attempts_remaing--){
         int ret = write(priv->sockfd, buff + written, len - written);
         if(ret < 0){
-            ERR("Could not write %s. Error: %s", type, strerror(errno));
-            IFWR_SET_ERROR(IFWR_ERR_WRITEFAIL);
+            IFWR_ERR("Could not write %s. Error: %s", type, strerror(errno));
+            IFWR_SET_IFWR_ERROR(IFWR_ERR_WRITEFAIL);
             return -1;
         }
         written += ret;
     }
 
     if(written != len || attempts_remaing <= 0){
-        DBG("Error could not write values! Tried 1000 times but failed\n");
-        IFWR_SET_ERROR(IFWR_ERR_WRITEFAIL);
+        IFWR_DBG("Error could not write values! Tried 1000 times but failed\n");
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_WRITEFAIL);
         return -1;
     }
 
-    DBG("Success! Wrote %i bytes of HTTP %s\n", written);
+    IFWR_DBG("Success! Wrote %i bytes of HTTP %s\n", written);
     return written;
 }
 
@@ -411,16 +414,16 @@ int ifwr_write_raw(ifwr_conn_t* conn, const char* prec, const char* format, ... 
     int sent_bytes = 0;
     int ret = http_post_header(conn, content_len, prec);
     if(ret < 0){
-        ERR("Could not send HTTP header!");
+        IFWR_ERR("Could not send HTTP header!");
         return -1;
     }
     sent_bytes += ret;
 
     ret = http_post_content(conn,content, content_len);
     if(ret < 0){
-        IFWR_SET_ERROR(IFWR_ERR_NOCONTENT);
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_NOCONTENT);
         ifwr_close(conn);
-        FAT("HTTP Header sent, but content failed to send. Closing. Nothing useful to be done here!\n");
+        IFWR_FAT("HTTP Header sent, but content failed to send. Closing. Nothing useful to be done here!\n");
         return -1;
     }
     sent_bytes += ret;
@@ -436,7 +439,7 @@ static int ktv2str(char* buff, int buff_len, const ifwr_ktv_t* ktv )
         switch(curr->type){
             case IFWR_TYPE_STOP:
                 //Impossible ? -- handled above
-                FAT("Impossible situation has happend!?\n");
+                IFWR_FAT("Impossible situation has happend!?\n");
                 break;
 
             case IFWR_TYPE_BOOL:
@@ -461,7 +464,7 @@ static int ktv2str(char* buff, int buff_len, const ifwr_ktv_t* ktv )
                 continue;
 
             case IFWR_TYPE_UNKOWN:
-                ERR("Found a type of UNKOWN, was your KTV unitialised?\n");
+                IFWR_ERR("Found a type of UNKOWN, was your KTV unitialised?\n");
                 break;
 
         }
@@ -489,8 +492,8 @@ int ifwr_send(
 		)
 {
     if(!conn){
-        DBG("No connection supplied\n");
-        IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+        IFWR_DBG("No connection supplied\n");
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
         return -1;
     }
 
@@ -499,21 +502,21 @@ int ifwr_send(
     //Figure out the measurement name
     if(!measurement){
         if(!priv->default_measurement){
-            IFWR_SET_ERROR(IFWR_ERR_NOMEASURE);
-            ERR("No default measurement name is set\n");
+            IFWR_SET_IFWR_ERROR(IFWR_ERR_NOMEASURE);
+            IFWR_ERR("No default measurement name is set\n");
             return -1;
         }
 
         measurement = priv->default_measurement;
     }
-    DBG("Measurement set to \"%s\"\n", measurement);
+    IFWR_DBG("Measurement set to \"%s\"\n", measurement);
 
     //Figure out the tags
     char* tags_str = NULL;
     if(!tags){
         if(!priv->default_tagset){
-            IFWR_SET_ERROR(IFWR_ERR_NOTAGS);
-            ERR("No default tagset is set\n");
+            IFWR_SET_IFWR_ERROR(IFWR_ERR_NOTAGS);
+            IFWR_ERR("No default tagset is set\n");
             return -1;
         }
         tags_str = priv->default_tagset;
@@ -523,18 +526,18 @@ int ifwr_send(
         ktv2str(tmp_tags, IFWR_MAX_MSG, tags);
         tags_str = tmp_tags;
     }
-    DBG("Tags set to \"%s\"\n", tags_str);
+    IFWR_DBG("Tags set to \"%s\"\n", tags_str);
 
     //Figure out the fields
     char fields_str[IFWR_MAX_MSG] = {0};
     if(!fields){
-        IFWR_SET_ERROR(IFWR_ERR_NOFIELDS);
-        ERR("No measurement fields supplied!\n");
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_NOFIELDS);
+        IFWR_ERR("No measurement fields supplied!\n");
         return -1;
     }
 
     ktv2str(fields_str, IFWR_MAX_MSG, fields);
-    DBG("Fields set to \"%s\"\n", fields_str);
+    IFWR_DBG("Fields set to \"%s\"\n", fields_str);
 
 
     //Figure out the timestamp
@@ -545,14 +548,14 @@ int ifwr_send(
 
     switch(ts_fmt){
         case IFWR_TS_UNDEF:
-            IFWR_SET_ERROR(IFWR_ERR_NOTIME);
-            ERR("No timestamp value set!\n");
+            IFWR_SET_IFWR_ERROR(IFWR_ERR_NOTIME);
+            IFWR_ERR("No timestamp value set!\n");
             return -1;
         case IFWR_TS_LOCAL:{
             struct timespec now_ts = {0};
             if(clock_gettime(CLOCK_REALTIME, &now_ts) < 0){
-                ERR("Could not get time! Error: %s", strerror(errno));
-                IFWR_SET_ERROR(IFWR_ERR_NOTIME);
+                IFWR_ERR("Could not get time! Error: %s", strerror(errno));
+                IFWR_SET_IFWR_ERROR(IFWR_ERR_NOTIME);
                 return -1;
             }
 
@@ -597,8 +600,8 @@ int ifwr_send(
           * I've forgotten a value.
           * */
     }
-    DBG("Timestamp precision is \"%s\"\n", prec);
-    DBG("Timestamp string is \"%s\"\n ", ts_str_tmp);
+    IFWR_DBG("Timestamp precision is \"%s\"\n", prec);
+    IFWR_DBG("Timestamp string is \"%s\"\n ", ts_str_tmp);
 
 
     //At this point we have strings for everything, just need to format it
@@ -606,7 +609,7 @@ int ifwr_send(
             measurement,
             tags_str,
             fields_str,
-            ts_str_tmp);
+            ts_str);
 
 }
 
@@ -614,8 +617,8 @@ int ifwr_send(
 int ifwr_response(ifwr_conn_t* conn)
 {
     if(!conn){
-          DBG("No connection supplied\n");
-          IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+          IFWR_DBG("No connection supplied\n");
+          IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
           return -1;
       }
 
@@ -628,8 +631,8 @@ int ifwr_response(ifwr_conn_t* conn)
 
     //Check if we've got a correct HTTP header
     if(memcmp(token,"HTTP/1.1 ",9) != 0){
-        ERR("Could not interpret \"%s\" as an HTTP header response\n", token);
-        IFWR_SET_ERROR(IFWR_ERR_BADHTTP);
+        IFWR_ERR("Could not interpret \"%s\" as an HTTP header response\n", token);
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_BADHTTP);
         return -1;
 
     }
@@ -640,14 +643,14 @@ int ifwr_response(ifwr_conn_t* conn)
     memcpy(err,token + 9,3);
     long http_err_code = strtol(err,&end,10);
     if(end == err){
-        ERR("No error code found in HTTP header response \"%s\"\n", token);
-        IFWR_SET_ERROR(IFWR_ERR_BADHTTP);
+        IFWR_ERR("No error code found in HTTP header response \"%s\"\n", token);
+        IFWR_SET_IFWR_ERROR(IFWR_ERR_BADHTTP);
         return -1;
     }
 
     priv->http_err_code = http_err_code;
     if(http_err_code >= 200 && http_err_code < 300 ){
-        DBG("Success with HTTP response code %li\n", http_err_code);
+        IFWR_DBG("Success with HTTP response code %li\n", http_err_code);
         priv->json_err_str = NULL;
         return 0;
     }
@@ -655,7 +658,7 @@ int ifwr_response(ifwr_conn_t* conn)
     token = strtok(NULL,"\r\n");
     while(token != NULL){
         if(token[0] == '{'){ //HACK! Assume the error line is JSON and starts with "{"
-            DBG("Failure with HTTP response code %li, message \"%s\"\n", http_err_code, token );
+            IFWR_DBG("Failure with HTTP response code %li, message \"%s\"\n", http_err_code, token );
             priv->json_err_str = token;
             return -1;
         }
@@ -663,16 +666,16 @@ int ifwr_response(ifwr_conn_t* conn)
     }
 
     //If we get here, we never found the Jason line!
-    DBG("Could not find JSON response. Bad HTTP message?\n");
-    IFWR_SET_ERROR(IFWR_ERR_BADHTTP);
+    IFWR_DBG("Could not find JSON response. Bad HTTP message?\n");
+    IFWR_SET_IFWR_ERROR(IFWR_ERR_BADHTTP);
     return -1;
 }
 
 int ifwr_http_err(ifwr_conn_t* conn, char** json_msg)
 {
     if(!conn){
-          DBG("No connection supplied\n");
-          IFWR_SET_ERROR(IFWR_ERR_NULLARG);
+          IFWR_DBG("No connection supplied\n");
+          IFWR_SET_IFWR_ERROR(IFWR_ERR_NULLARG);
           return -1;
       }
 
